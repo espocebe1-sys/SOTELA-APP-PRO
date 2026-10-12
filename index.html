@@ -41,8 +41,19 @@ let consumer=JSON.parse(localStorage.getItem('sotela_consumer')||'null');
 let channelAccount=channels[0]||null;
 const names={home:'Accueil',account:'CRÉER VOTRE COMPTE',market:'SOMBA/TEKA',store:'ENREGITRER VOTRE MAISON COMMERCIALE',stores:'VOS MAGASINS',profile:'Profil',lamba:'LAMBA',channel:'ENREGITRER VOTRE chaine de recette',consumer:'CONSO. FINAL',recipes:'REGARDER RECETTE',post:'POSTER MA RECETTE D’aujourd’hui',share:'Poster',orderchannels:'COMMANDER'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function save(){localStorage.setItem('sotela_active_store',activeStoreId);localStorage.setItem('sotela_user',JSON.stringify(user));localStorage.setItem('sotela_stores',JSON.stringify(stores));localStorage.setItem('sotela_channels',JSON.stringify(channels));localStorage.setItem('sotela_recipes',JSON.stringify(recipes));localStorage.setItem('sotela_orders',JSON.stringify(orders));localStorage.setItem('sotela_consumer',JSON.stringify(consumer));localStorage.setItem('sotela_channels',JSON.stringify(channelAccount?[channelAccount]:[]))}
-function toast(s){let t=$('#toast');t.textContent=s;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
+function save(){
+  localStorage.setItem('sotela_active_store',activeStoreId);
+  localStorage.setItem('sotela_user',JSON.stringify(user));
+  localStorage.setItem('sotela_stores',JSON.stringify(stores));
+  localStorage.setItem('sotela_channels',JSON.stringify(channels));
+  localStorage.setItem('sotela_recipes',JSON.stringify(recipes));
+  localStorage.setItem('sotela_orders',JSON.stringify(orders));
+  localStorage.setItem('sotela_consumer',JSON.stringify(consumer));
+  localStorage.setItem('sotela_channels',JSON.stringify(channelAccount?[channelAccount]:[]));
+  if(typeof syncSotelaShared==='function'){
+    syncSotelaShared();
+  }
+}
 function go(p){page=p;$('#sidebar').classList.remove('open');render();window.scrollTo({top:0,behavior:'smooth'})}
 function head(title,desc='',eyebrow='SOTELA'){return `<div class="head"><div><div class="eyebrow">${title=== 'SOTELA'?'SOTELA':eyebrow}</div><h1>${title}</h1>${desc?`<p>${desc}</p>`:''}</div></div>`}
 function field(label,name,type='text',placeholder=''){return `<div class="field"><label>${label}</label><input name="${name}" type="${type}" placeholder="${placeholder}"></div>`}
@@ -100,14 +111,48 @@ if(e.target.id==='recipeForm'){e.preventDefault();if(!channelAccount){toast('Cr�
 if(e.target.id==='shareForm'){e.preventDefault();toast('Poster')}
 });
 render();
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const supabaseUrl = "https://zxcehlbyqrrfebermvfd.supabase.co";
-  const sotelaKey = "sb_publishable_TvVrMbT1Z9qx-urn3LLP6w_k2V-oNjy";
-  const supabaseClient = supabase.createClient(
-    supabaseUrl,
-    sotelaKey
-  );
+const supabaseUrl = "https://zxcehlbyqrrfebermvfd.supabase.co";
+const sotelaKey = "sb_publishable_TvVrMbT1Z9qx-urn3LLP6w_k2V-oNjy";
+const supabaseClient = window.supabase.createClient(
+  supabaseUrl,
+  sotelaKey
+);
+ async function syncSotelaShared(){
+  const rows = [
+    ...stores.map(s => ({
+      id: s.id,
+      kind: 'store',
+      data: s
+    })),
+    ...channels.map(c => ({
+      id: c.id,
+      kind: 'channel',
+      data: c
+    })),
+    ...recipes.map(r => ({
+      id: r.id,
+      kind: 'recipe',
+      data: r
+    }))
+  ];
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabaseClient
+    .from('sotela_shared')
+    .upsert(rows, { onConflict: 'id' });
+
+  if (error) {
+    console.error('Erreur Supabase :', error.message);
+    if (typeof toast === 'function') {
+      toast('Erreur de synchronisation Supabase');
+    }
+  }
+}
 </script>
 </body>
 </html>
