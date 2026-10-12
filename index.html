@@ -100,13 +100,14 @@ if(e.target.id==='recipeForm'){e.preventDefault();if(!channelAccount){toast('Cr√
 if(e.target.id==='shareForm'){e.preventDefault();toast('Poster')}
 });
 render();
-</script>
-<<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const supabaseUrl = "https://zxcehlbyqrrfebermvfd.supabase.co";
   const sotelaKey = "sb_publishable_TvVrMbT1Z9qx-urn3LLP6w_k2V-oNjy";
-  const supabaseClient = supabase.createClient(supabaseUrl, sotelaKey);
+  const supabaseClient = supabase.createClient(
+    supabaseUrl,
+    sotelaKey
+  );
 </script>
-
 </body>
 </html>
