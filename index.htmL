@@ -32,6 +32,10 @@ const $=s=>document.querySelector(s), content=$('#content');
 let page='home',marketType='TOUS';
 let activeStoreId=localStorage.getItem('sotela_active_store')||'';
 let user=JSON.parse(localStorage.getItem('sotela_user')||'{}');
+const sotelaLocalUserId=localStorage.getItem('sotela_user_id')||('user-'+Date.now()+'-'+Math.random().toString(36).slice(2,10));
+localStorage.setItem('sotela_user_id',sotelaLocalUserId);
+if(!user.id) user.id=sotelaLocalUserId;
+let sharedProfiles=JSON.parse(localStorage.getItem('sotela_profiles')||'[]');
 let stores=JSON.parse(localStorage.getItem('sotela_stores')||'[]');
 stores.forEach((s,i)=>{if(!s.id)s.id='store-'+i+'-'+String(s.nom||'magasin').toLowerCase().replace(/[^a-z0-9]+/g,'-')});
 let channels=JSON.parse(localStorage.getItem('sotela_channels')||'[]');
@@ -42,17 +46,18 @@ let channelAccount=channels[0]||null;
 const names={home:'Accueil',account:'CRÉER VOTRE COMPTE',market:'SOMBA/TEKA',store:'ENREGITRER VOTRE MAISON COMMERCIALE',stores:'VOS MAGASINS',profile:'Profil',lamba:'LAMBA',channel:'ENREGITRER VOTRE chaine de recette',consumer:'CONSO. FINAL',recipes:'REGARDER RECETTE',post:'POSTER MA RECETTE D’aujourd’hui',share:'Poster',orderchannels:'COMMANDER'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function save(){
+  if(!user.id) user.id=sotelaLocalUserId;
+  if(consumer && !consumer.id) consumer.id='consumer-'+sotelaLocalUserId;
+  orders=orders.map((o,i)=>({...o,id:o.id||('order-'+sotelaLocalUserId+'-'+i+'-'+Date.now())}));
   localStorage.setItem('sotela_active_store',activeStoreId);
   localStorage.setItem('sotela_user',JSON.stringify(user));
+  localStorage.setItem('sotela_profiles',JSON.stringify(sharedProfiles));
   localStorage.setItem('sotela_stores',JSON.stringify(stores));
   localStorage.setItem('sotela_channels',JSON.stringify(channels));
   localStorage.setItem('sotela_recipes',JSON.stringify(recipes));
   localStorage.setItem('sotela_orders',JSON.stringify(orders));
   localStorage.setItem('sotela_consumer',JSON.stringify(consumer));
-  localStorage.setItem('sotela_channels',JSON.stringify(channelAccount?[channelAccount]:[]));
-  if(typeof syncSotelaShared==='function'){
-    syncSotelaShared();
-  }
+  if(typeof syncSotelaShared==='function') syncSotelaShared('push');
 }
 function go(p){page=p;$('#sidebar').classList.remove('open');render();window.scrollTo({top:0,behavior:'smooth'})}
 function head(title,desc='',eyebrow='SOTELA'){return `<div class="head"><div><div class="eyebrow">${title=== 'SOTELA'?'SOTELA':eyebrow}</div><h1>${title}</h1>${desc?`<p>${desc}</p>`:''}</div></div>`}
@@ -97,16 +102,16 @@ function editStoreById(id){const i=stores.findIndex(s=>s.id===id);if(i>=0)editSt
 function whatsappNumber(n){let d=String(n||'').replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('0'))d='243'+d.slice(1);return d}
 function contact(n){const number=whatsappNumber(n);if(number)window.open('https://wa.me/'+number,'_blank');else toast('Numéro WhatsApp non renseigné')}
 function facebookSearch(name){const q=String(name||'').trim();if(q)window.open('https://www.facebook.com/search/top?q='+encodeURIComponent(q),'_blank');else toast('Nom Facebook non renseigné')}
-function order(n){orders.push({nom:n,date:new Date().toISOString()});save();toast('COMMANDER')}
+function order(n){orders.push({id:'order-'+sotelaLocalUserId+'-'+Date.now(),nom:n,date:new Date().toISOString(),clientId:sotelaLocalUserId});save();toast('Commande enregistrée')}
 document.querySelectorAll('#nav, #mobileBottom').forEach(nav=>nav.addEventListener('click',e=>{let b=e.target.closest('[data-page]');if(b)go(b.dataset.page)}));
 document.addEventListener('click',e=>{let b=e.target.closest('[data-go]');if(b)go(b.dataset.go)});
 $('#menuBtn').addEventListener('click',()=>$('#sidebar').classList.toggle('open'));
 $('#helpBtn').addEventListener('click',()=>toast('SOTELA'));
 document.addEventListener('submit',e=>{
-if(e.target.id==='accountForm'){e.preventDefault();let d=new FormData(e.target);['prenom','nom','sexe','age','activite','adresse','whatsapp','facebook'].forEach(k=>user[k]=d.get(k)||'');save();toast('Enregistrer');go('profile')}
+if(e.target.id==='accountForm'){e.preventDefault();let d=new FormData(e.target);['prenom','nom','sexe','age','activite','adresse','whatsapp','facebook'].forEach(k=>user[k]=d.get(k)||'');user.id=sotelaLocalUserId;sharedProfiles=sharedProfiles.filter(p=>p.id!==user.id);sharedProfiles.push({...user});save();toast('Enregistrer');go('profile')}
 if(e.target.id==='storeForm'){e.preventDefault();let d=new FormData(e.target),s={};['type','nom','categorie','adresse','contact','whatsapp','facebook','email'].forEach(k=>s[k]=d.get(k)||'');if(e.target.dataset.edit!==undefined){const i=+e.target.dataset.edit;s.id=stores[i]?.id||('store-'+Date.now());stores[i]=s}else{s.id='store-'+Date.now()+'-'+stores.length;stores.push(s)}save();toast('Enregistrer');go('stores')}
 if(e.target.id==='channelForm'){e.preventDefault();if(channelAccount){toast('Un seul compte Canal Recette est autorisé');go('channel');return}let d=new FormData(e.target),s={id:'channel-'+Date.now()};['type','nom','categorie','tiktok','facebook','whatsapp','email'].forEach(k=>s[k]=d.get(k)||'');channelAccount=s;channels=[s];save();toast('Canal créé');go('lamba')}
-if(e.target.id==='consumerForm'){e.preventDefault();let d=new FormData(e.target);consumer={nom:d.get('nom')||'',adresse:d.get('adresse')||'',whatsapp:d.get('whatsapp')||''};save();toast('Compte consommateur enregistré');go('consumer')}
+if(e.target.id==='consumerForm'){e.preventDefault();let d=new FormData(e.target);consumer={id:'consumer-'+sotelaLocalUserId,nom:d.get('nom')||'',adresse:d.get('adresse')||'',whatsapp:d.get('whatsapp')||''};save();toast('Compte consommateur enregistré');go('consumer')}
 if(e.target.id==='recipeForm'){e.preventDefault();if(!channelAccount){toast('Créez d’abord votre canal');go('channel');return}let d=new FormData(e.target);recipes.unshift({id:'recipe-'+Date.now(),channelId:channelAccount.id,channelName:channelAccount.nom,nom:channelAccount.nom,texte:d.get('texte')||'',lien:d.get('lien')||''});save();toast('Recette publiée');go('lamba')}
 if(e.target.id==='shareForm'){e.preventDefault();toast('Poster')}
 });
@@ -116,43 +121,100 @@ render();
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const supabaseUrl = "https://zxcehlbyqrrfebermvfd.supabase.co";
-const sotelaKey = "sb_publishable_TvVrMbT1Z9qx-urn3LLP6w_k2V-oNjy";
-const supabaseClient = window.supabase.createClient(
-  supabaseUrl,
-  sotelaKey
-);
- async function syncSotelaShared(){
-  const rows = [
-    ...stores.map(s => ({
-      id: s.id,
-      kind: 'store',
-      data: s
-    })),
-    ...channels.map(c => ({
-      id: c.id,
-      kind: 'channel',
-      data: c
-    })),
-    ...recipes.map(r => ({
-      id: r.id,
-      kind: 'recipe',
-      data: r
-    }))
+// Clé publishable fournie pour le projet SOTELA (ne jamais mettre une secret key dans le navigateur).
+const sotelaKey = "sb_publishable_TvVrMbTlZ9qx-urn3LLP6w_k2V-oNjy";
+const supabaseClient = window.supabase.createClient(supabaseUrl, sotelaKey);
+let sotelaSyncBusy = false;
+let sotelaSyncAgain = false;
+let sotelaLastSyncError = '';
+
+function sotelaRowsFromLocal(){
+  if(user && Object.keys(user).some(k=>k!=='id' && user[k]!=='' && user[k]!=null)){
+    user.id=user.id||sotelaLocalUserId;
+    sharedProfiles=sharedProfiles.filter(p=>p.id!==user.id);
+    sharedProfiles.push({...user});
+  }
+  if(consumer && !consumer.id) consumer.id='consumer-'+sotelaLocalUserId;
+  stores=stores.map((x,i)=>({...x,id:x.id||('store-'+sotelaLocalUserId+'-'+i)}));
+  channels=channels.map((x,i)=>({...x,id:x.id||('channel-'+sotelaLocalUserId+'-'+i)}));
+  recipes=recipes.map((x,i)=>({...x,id:x.id||('recipe-'+sotelaLocalUserId+'-'+i)}));
+  orders=orders.map((x,i)=>({...x,id:x.id||('order-'+sotelaLocalUserId+'-'+i+'-'+Date.now())}));
+  return [
+    ...sharedProfiles.map(x=>({id:String(x.id),kind:'profile',data:x})),
+    ...stores.map(x=>({id:String(x.id),kind:'store',data:x})),
+    ...channels.map(x=>({id:String(x.id),kind:'channel',data:x})),
+    ...recipes.map(x=>({id:String(x.id),kind:'recipe',data:x})),
+    ...(consumer?[{id:String(consumer.id),kind:'consumer',data:consumer}]:[]),
+    ...orders.map(x=>({id:String(x.id),kind:'order',data:x}))
   ];
-
-  if (rows.length === 0) return;
-
-  const { error } = await supabaseClient
-    .from('sotela_shared')
-    .upsert(rows, { onConflict: 'id' });
-
-  if (error) {
-    console.error('Erreur Supabase :', error.message);
-    if (typeof toast === 'function') {
-      toast('Erreur de synchronisation Supabase');
+}
+function sotelaMergeRows(remoteRows, preferLocal){
+  const remoteByKind={profile:new Map(),store:new Map(),channel:new Map(),recipe:new Map(),consumer:new Map(),order:new Map()};
+  (remoteRows||[]).forEach(row=>{
+    if(row && row.kind && row.data && remoteByKind[row.kind]) remoteByKind[row.kind].set(String(row.id),{...row.data,id:row.data.id||String(row.id)});
+  });
+  const localRows=sotelaRowsFromLocal();
+  localRows.forEach(row=>{
+    const map=remoteByKind[row.kind];
+    if(map && (preferLocal || !map.has(String(row.id)))) map.set(String(row.id),row.data);
+  });
+  sharedProfiles=Array.from(remoteByKind.profile.values());
+  const ownProfile=sharedProfiles.find(p=>String(p.id)===String(sotelaLocalUserId));
+  if(ownProfile) user=ownProfile;
+  stores=Array.from(remoteByKind.store.values());
+  channels=Array.from(remoteByKind.channel.values());
+  recipes=Array.from(remoteByKind.recipe.values());
+  orders=Array.from(remoteByKind.order.values());
+  const ownConsumer=Array.from(remoteByKind.consumer.values()).find(c=>String(c.id)==='consumer-'+sotelaLocalUserId);
+  if(ownConsumer) consumer=ownConsumer;
+  channelAccount=channels.find(c=>String(c.id)===String(localStorage.getItem('sotela_channel_id')||''))||channels.find(c=>c.ownerId===sotelaLocalUserId)||channels[0]||null;
+  if(channelAccount && channelAccount.ownerId===sotelaLocalUserId) localStorage.setItem('sotela_channel_id',channelAccount.id);
+  localStorage.setItem('sotela_user',JSON.stringify(user));
+  localStorage.setItem('sotela_profiles',JSON.stringify(sharedProfiles));
+  localStorage.setItem('sotela_stores',JSON.stringify(stores));
+  localStorage.setItem('sotela_channels',JSON.stringify(channels));
+  localStorage.setItem('sotela_recipes',JSON.stringify(recipes));
+  localStorage.setItem('sotela_orders',JSON.stringify(orders));
+  localStorage.setItem('sotela_consumer',JSON.stringify(consumer));
+}
+async function syncSotelaShared(mode='pull'){
+  if(sotelaSyncBusy){ if(mode==='push') sotelaSyncAgain=true; return; }
+  sotelaSyncBusy=true;
+  try{
+    if(!window.supabase || !window.supabase.createClient) throw new Error('La bibliothèque Supabase ne s’est pas chargée. Vérifiez votre connexion Internet.');
+    // Le mode push écrit les modifications de cet appareil. Le mode pull laisse la priorité aux données serveur.
+    if(mode==='push'){
+      const localRows=sotelaRowsFromLocal();
+      if(localRows.length){
+        const {error}=await supabaseClient.from('Sotela shared').upsert(localRows,{onConflict:'id'});
+        if(error) throw error;
+      }
     }
+    const {data:remoteRows,error:readError}=await supabaseClient.from('Sotela shared').select('id, kind, data');
+    if(readError) throw readError;
+    sotelaMergeRows(remoteRows||[],mode==='push');
+    // Après le premier chargement, les données locales absentes du serveur sont envoyées sans remplacer les données serveur existantes.
+    if(mode!=='push'){
+      const existing=new Set((remoteRows||[]).map(r=>String(r.id)));
+      const missing=sotelaRowsFromLocal().filter(r=>!existing.has(String(r.id)));
+      if(missing.length){
+        const {error:writeError}=await supabaseClient.from('Sotela shared').upsert(missing,{onConflict:'id'});
+        if(writeError) throw writeError;
+      }
+    }
+    sotelaLastSyncError='';
+    if(typeof render==='function') render();
+  }catch(error){
+    sotelaLastSyncError=error?.message||String(error);
+    console.error('Erreur de synchronisation Supabase :',error);
+    if(typeof toast==='function') toast('Synchronisation échouée : '+sotelaLastSyncError.slice(0,150));
+  }finally{
+    sotelaSyncBusy=false;
+    if(sotelaSyncAgain){sotelaSyncAgain=false;syncSotelaShared('push');}
   }
 }
+// Importer les données partagées au démarrage.
+syncSotelaShared('pull');
 </script>
 </body>
 </html>
