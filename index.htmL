@@ -186,11 +186,11 @@ async function syncSotelaShared(mode='pull'){
     if(mode==='push'){
       const localRows=sotelaRowsFromLocal();
       if(localRows.length){
-        const {error}=await supabaseClient.from('Sotela shared').upsert(localRows,{onConflict:'id'});
+        const {error}=await supabaseClient.from('Sotela_shared').upsert(localRows,{onConflict:'id'});
         if(error) throw error;
       }
     }
-    const {data:remoteRows,error:readError}=await supabaseClient.from('Sotela shared').select('id, kind, data');
+    const {data:remoteRows,error:readError}=await supabaseClient.from('Sotela_shared').select('id, kind, data');
     if(readError) throw readError;
     sotelaMergeRows(remoteRows||[],mode==='push');
     // Après le premier chargement, les données locales absentes du serveur sont envoyées sans remplacer les données serveur existantes.
